@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request, render_template, redirect, session, f
 from flask_bcrypt import Bcrypt
 import bcrypt
 from flask_debugtoolbar import DebugToolbarExtension
-from models import db, connect_db, User
+from models import db, connect_db, User, Feedback
 from forms import AddUserForm, LoginForm
 
 app = Flask(__name__)
@@ -48,7 +48,9 @@ def display_user_form():
         db.session.add(user)
         db.session.commit()
 
-        return redirect("/secret")
+        session["user_username"] = user.username
+
+        return redirect(f"/users/{username}")
 
     else:
         return render_template("user_form.html", form=form)
@@ -68,7 +70,7 @@ def display_login_form():
 
         if user:
             session["user_username"] = user.username
-            return redirect("/secret")
+            return redirect(f"/users/{username}")
 
         else:
             form.username.errors = ["Bad name/password"]
@@ -76,17 +78,17 @@ def display_login_form():
     return render_template("login_form.html", form=form)
 
 
-@app.route("/secret")
-def display_secret_page():
+@app.route("/users/<username>")
+def display_secret_page(username):
     """Shows the secret page to properly logged in users."""
 
     if "user_username" not in session:
         flash("You must be logged in to view!")
-        # Getting a double flash message, to investigate
         return redirect("/login")
 
     else:
-        return render_template("secret.html")
+        user = User.query.get_or_404(username)
+        return render_template("secret.html", user=user)
 
 
 @app.route("/logout")
@@ -96,3 +98,24 @@ def logout():
     session.pop("user_username")
 
     return redirect("/")
+
+
+@app.route("/users/<username>/delete")
+def delete_user(username):
+    """  Allow only an authenticated user to delete themselves """
+
+    if "user_username" not in session:
+        flash("You must be logged in to delete yourself!")
+        return redirect("/login")
+
+    # get user, delete user & feedback, remove from session
+    else:
+        user = User.query.get_or_404(username)
+        # a list of feedback objects from the user
+        Feedback.query.filter(username == user.username).delete()
+        db.session.commit()
+        db.session.delete(user)
+        db.session.commit()
+        # taking care of the session too
+        session.pop('user_username')
+        return redirect('/')

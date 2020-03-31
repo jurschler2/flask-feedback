@@ -67,3 +67,20 @@ class User(db.Model):
 
     last_name = db.Column(db.String(30),
                           nullable=False)
+
+
+class Feedback(db.Model):
+    """  Creates Feedback instance """
+
+    __tablename__ = "feedbacks"
+
+    id = db.Column(db.Integer,
+                   primary_key=True,
+                   autoincrement=True)
+    title = db.Column(db.String(100),
+                      nullable=False)
+    content = db.Column(db.String(),
+                        nullable=False)
+    # can we do this without db.Column...db.ForeignKey?
+    username = db.Column(db.String(), db.ForeignKey('users.username'))
+    user = db.relationship('User', backref='feedbacks')
