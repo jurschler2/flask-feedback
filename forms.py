@@ -1,7 +1,7 @@
 """Forms for creating a user."""
 
 from flask_wtf import FlaskForm
-from wtforms import StringField
+from wtforms import StringField, PasswordField
 from wtforms.validators import InputRequired, Length
 
 
@@ -11,8 +11,8 @@ class AddUserForm(FlaskForm):
     username = StringField("Username",
                            validators=[InputRequired(), Length(max=20)])
 
-    password = StringField("Password",
-                           validators=[InputRequired()])
+    password = PasswordField("Password",
+                             validators=[InputRequired()])
 
     email = StringField("Email",
                         validators=[InputRequired(), Length(max=50)])
@@ -22,3 +22,13 @@ class AddUserForm(FlaskForm):
 
     last_name = StringField("Last Name",
                             validators=[InputRequired(), Length(max=30)])
+
+
+class LoginForm(FlaskForm):
+    """ Form for handling the logging in of a user. """
+
+    username = StringField("Username",
+                           validators=[InputRequired(), Length(max=20)])
+
+    password = PasswordField("Password",
+                             validators=[InputRequired()])

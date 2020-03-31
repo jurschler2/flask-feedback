@@ -1,10 +1,10 @@
 """Flask app for User Feedbacks"""
-from flask import Flask, jsonify, request, render_template, redirect
+from flask import Flask, jsonify, request, render_template, redirect, session, flash
 from flask_bcrypt import Bcrypt
 import bcrypt
 from flask_debugtoolbar import DebugToolbarExtension
 from models import db, connect_db, User
-from forms import AddUserForm
+from forms import AddUserForm, LoginForm
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///feedback-app'
@@ -33,7 +33,7 @@ def homepage():
 
 @app.route("/register", methods=["GET", "POST"])
 def display_user_form():
-    """ Show accept submission of user form. """
+    """ Show and accept submission of user form. """
 
     form = AddUserForm()
 
@@ -52,3 +52,47 @@ def display_user_form():
 
     else:
         return render_template("user_form.html", form=form)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def display_login_form():
+    """ Show and accept submission of login form. """
+
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
+
+        user = User.authenticate(username, password)
+
+        if user:
+            session["user_username"] = user.username
+            return redirect("/secret")
+
+        else:
+            form.username.errors = ["Bad name/password"]
+
+    return render_template("login_form.html", form=form)
+
+
+@app.route("/secret")
+def display_secret_page():
+    """Shows the secret page to properly logged in users."""
+
+    if "user_username" not in session:
+        flash("You must be logged in to view!")
+        # Getting a double flash message, to investigate
+        return redirect("/login")
+
+    else:
+        return render_template("secret.html")
+
+
+@app.route("/logout")
+def logout():
+    """Logs user out and redirects to homepage."""
+
+    session.pop("user_username")
+
+    return redirect("/")

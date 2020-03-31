@@ -10,6 +10,17 @@
 
 <body>
   <div class="container">
+    {% if 'user_username' in session %}
+    <li><a href="/logout">Logout</a></li>
+    <li><a href="/secret">Secret</a></li>
+    {% endif %}
+
+    {% for msg in get_flashed_messages() %}
+
+    <p>{{ msg }}</p>
+
+    {% endfor %}
+    
     {% block content %} 
     
     {% endblock %}
