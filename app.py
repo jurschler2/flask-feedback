@@ -4,7 +4,7 @@ from flask_bcrypt import Bcrypt
 import bcrypt
 from flask_debugtoolbar import DebugToolbarExtension
 from models import db, connect_db, User, Feedback
-from forms import AddUserForm, LoginForm
+from forms import AddUserForm, LoginForm, FeedbackForm
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///feedback-app'
@@ -80,7 +80,11 @@ def display_login_form():
 
 @app.route("/users/<username>")
 def display_secret_page(username):
-    """Shows the secret page to properly logged in users."""
+    """Shows the secret page to properly logged in users.
+    We're going to let other users LOOK at each other's profiles
+    and feedback. Everything else below should prevent editing someone
+    else's feedback.
+    """
 
     if "user_username" not in session:
         flash("You must be logged in to view!")
@@ -100,17 +104,21 @@ def logout():
     return redirect("/")
 
 
-@app.route("/users/<username>/delete")
+# TSK TSK silly rabbit, it's a delete, not a POST
+@app.route("/users/<username>/delete", methods=["DELETE"])
 def delete_user(username):
     """  Allow only an authenticated user to delete themselves """
+    user = User.query.get_or_404(username)
 
     if "user_username" not in session:
         flash("You must be logged in to delete yourself!")
         return redirect("/login")
+    elif session['user_username'] != user.username:
+        flash("You can't edit someone else's feedback")
+        return redirect('/')
 
     # get user, delete user & feedback, remove from session
     else:
-        user = User.query.get_or_404(username)
         # a list of feedback objects from the user
         Feedback.query.filter(username == user.username).delete()
         db.session.commit()
@@ -119,3 +127,83 @@ def delete_user(username):
         # taking care of the session too
         session.pop('user_username')
         return redirect('/')
+
+
+@app.route("/users/<username>/feedback/add", methods=["GET", "POST"])
+def display_add_feedback_form(username):
+    """ GET show form for adding feedback as a logged in user
+        POST take the form data
+     """
+
+    if "user_username" not in session:
+        flash("You must be logged in to give feedback! Put your name on it!")
+        return redirect("/login")
+    elif session['user_username'] != username:
+        flash("You can't edit someone else's feedback")
+        return redirect('/')
+    else:
+        form = FeedbackForm()
+        if form.validate_on_submit():
+            username = username
+            title = form.title.data
+            content = form.content.data
+            feedback = Feedback(title=title,
+                                content=content, username=username)
+
+            db.session.add(feedback)
+            db.session.commit()
+            return redirect(f'/users/{username}')
+        else:
+            return render_template("feedback.html", form=form)
+
+
+# POST in instructions became PATCH, because we're sticklers for the rules
+# but then POST worked. Why come? was PATCH just for APIs?
+@app.route("/feedback/<feedback_id>/update", methods=["GET", "POST"])
+def show_update_feedback_form(feedback_id):
+    """ Let's logged in users update their previous feedback """
+    # TODO jay: come back through and make this a function taking
+    # flash message and redirect
+    previous = Feedback.query.get_or_404(feedback_id)
+
+    if "user_username" not in session:
+        flash("You must be logged in to give feedback! Put your name on it!")
+        return redirect("/login")
+    elif session['user_username'] != previous.username:
+        flash("You can't edit someone else's feedback")
+        return redirect('/')
+    else:
+        # pulls current version of feedback
+        # passing obj of previous into FeedbackForm to auto fill values
+        form = FeedbackForm(obj=previous)
+
+        if form.validate_on_submit():
+            title = form.title.data
+            content = form.content.data
+
+            previous.title = title
+            previous.content = content
+
+            db.session.commit()
+            return redirect(f'/users/{previous.username}')
+
+        else:
+            return render_template('edit_feedback.html', form=form)
+
+# why does this work as GET&POST? but not just DELETE? or POST?
+@app.route("/feedback/<feedback_id>/delete", methods=["GET", "POST"])
+def delete_feedback(feedback_id):
+    """ deletes feedback from user list when hitting delete button """
+    feedback = Feedback.query.get_or_404(feedback_id)
+    username = feedback.username
+
+    if "user_username" not in session:
+        flash("You must be logged in to give feedback! Put your name on it!")
+        return redirect("/login")
+    elif session['user_username'] != feedback.username:
+        flash("You can't delete someone else's feedback")
+        return redirect('/')
+    else:
+        db.session.delete(feedback)
+        db.session.commit()
+        return redirect(f'/users/{username}')
